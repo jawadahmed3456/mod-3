@@ -1,0 +1,49 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+contract Token is ERC20 {
+    address public custodianAddress;
+
+    event TokensTransferred(address indexed sender, address indexed beneficiary, uint256 amount);
+    event OwnershipTransferred(address indexed oldCustodian, address indexed newCustodian);
+
+    modifier onlyCustodian() {
+        require(msg.sender == custodianAddress, "Only the custodian can call this function");
+        _;
+    }
+
+    constructor(uint256 initialSupply) ERC20("token", "tk") {
+        custodianAddress = msg.sender;
+        _mint(custodianAddress, initialSupply);
+    }
+
+    function minttokens(address beneficiaryAddress, uint256 issuedAmount) external onlyCustodian {
+        _mint(beneficiaryAddress, issuedAmount);
+        emit TokensTransferred(address(0), beneficiaryAddress, issuedAmount);
+    }
+
+    function burnTokens(uint256 destroyedAmount) external {
+        require(balanceOf(msg.sender) >= destroyedAmount, "Insufficient WHA funds");
+        _burn(msg.sender, destroyedAmount);
+        emit TokensTransferred(msg.sender, address(0), destroyedAmount);
+    }
+
+    function transferTokens(address receiver, uint256 transferAmount) external returns (bool) {
+        _transfer(msg.sender, receiver, transferAmount);
+        emit TokensTransferred(msg.sender, receiver, transferAmount);
+        return true;
+    }
+
+    function transferOwnership(address newCustodian) external onlyCustodian {
+        require(newCustodian != address(0), "Invalid new custodian address");
+        emit OwnershipTransferred(custodianAddress, newCustodian);
+        custodianAddress = newCustodian;
+    }
+
+    function abandonOwnership() external onlyCustodian {
+        emit OwnershipTransferred(custodianAddress, address(0));
+        custodianAddress = address(0);
+    }
+}
